@@ -203,7 +203,10 @@ BattleActionAttack::BattleActionAttack(const BattleActionCost& action, BattleIte
  * @param save Pointer to the save game.
  * @param parentState Pointer to the parent battlescape state.
  */
-BattlescapeGame::BattlescapeGame(SavedBattleGame *save, BattlescapeState *parentState) : _save(save), _parentState(parentState), _playerPanicHandled(true), _AIActionCounter(0), _AISecondMove(false), _playedAggroSound(false), _endTurnRequested(false), _endConfirmationHandled(false)
+BattlescapeGame::BattlescapeGame(SavedBattleGame *save, BattlescapeState *parentState) :
+	_save(save), _parentState(parentState),
+	_playerPanicHandled(true), _AIActionCounter(0), _AISecondMove(false), _playedAggroSound(false),
+	_endTurnRequested(false), _endConfirmationHandled(false), _allEnemiesNeutralized(false)
 {
 
 	_currentAction.actor = 0;
@@ -1810,15 +1813,14 @@ void BattlescapeGame::primaryAction(Position pos)
 		{
 			if (_save->selectUnit(pos) && _save->selectUnit(pos)->getVisible())
 			{
-				bool canPsiTargetSameFaction = _currentAction.weapon->getRules()->canPsiTargetSameFaction();
-				if (_currentAction.type == BA_MINDCONTROL)
+				auto targetFaction = _save->selectUnit(pos)->getFaction();
+				bool psiTargetAllowed = _currentAction.weapon->getRules()->isPsiTargetAllowed(targetFaction);
+				if (_currentAction.type == BA_MINDCONTROL && targetFaction == FACTION_PLAYER)
 				{
 					// no mind controlling allies, unwanted side effects
-					canPsiTargetSameFaction = false;
+					psiTargetAllowed = false;
 				}
-				bool canPsiTargetOtherFactions = _currentAction.weapon->getRules()->canPsiTargetOtherFactions();
-				bool isDifferentFaction = _save->selectUnit(pos)->getFaction() != _save->getSelectedUnit()->getFaction();
-				if ((canPsiTargetOtherFactions && isDifferentFaction) || (canPsiTargetSameFaction && !isDifferentFaction))
+				if (psiTargetAllowed)
 				{
 					_currentAction.updateTU();
 					_currentAction.target = pos;
@@ -3071,6 +3073,7 @@ void BattlescapeGame::autoEndBattle()
 			end = (liveAliens == 0 || liveSoldiers == 0);
 			if (liveAliens == 0)
 			{
+				_allEnemiesNeutralized = true; // remember that all aliens were neutralized (and the battle should end no matter what)
 				askForConfirmation = true;
 			}
 		}
